@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Health Monitoring Dashboard</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <div class="app-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-logo">
+          <i class="fa-solid fa-heart-pulse logo-icon"></i>
+          <span class="logo-text">Pulse<span class="highlight">Guard</span></span>
+        </div>
+        <span class="version-tag">FSM v1.0</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">MAIN MENU</div>
+        <a href="#overview" class="nav-link active" data-tab="overview">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Overview</span>
+        </a>
+        <a href="#servers" class="nav-link" data-tab="servers">
+          <i class="fa-solid fa-server"></i>
+          <span>Server Fleet</span>
+          <span class="badge-count" id="nav-server-count">0</span>
+        </a>
+        <a href="#analytics" class="nav-link" data-tab="analytics">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Analytics & Trends</span>
+        </a>
+        <a href="#history" class="nav-link" data-tab="history">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>Monitoring History</span>
+        </a>
+        <a href="#fsm-guide" class="nav-link" data-tab="fsm-guide">
+          <i class="fa-solid fa-diagram-project"></i>
+          <span>FSM Architecture</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Controls & Simulator Widget -->
+      <div class="sidebar-footer">
+        <div class="simulator-card">
+          <div class="sim-header">
+            <span class="sim-title"><i class="fa-solid fa-vial"></i> Local Test Server</span>
+            <span class="status-indicator-dot healthy" id="sim-indicator"></span>
+          </div>
+          <p class="sim-desc">Endpoint: <code>:5000/health</code></p>
+          <div class="sim-actions">
+            <button class="btn btn-xs btn-outline-warning" id="btn-toggle-test-server" title="Toggle response between 200 OK and 503 Outage">
+              <i class="fa-solid fa-toggle-on"></i> <span id="sim-btn-text">Simulate Outage</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="auto-refresh-pill">
+          <div class="refresh-info">
+            <i class="fa-solid fa-arrows-rotate fa-spin-hover" id="refresh-icon"></i>
+            <span>Auto-refresh: <strong id="refresh-countdown">5s</strong></span>
+          </div>
+          <button class="btn-icon-subtle" id="btn-toggle-auto-refresh" title="Pause / Resume auto refresh">
+            <i class="fa-solid fa-pause" id="auto-refresh-icon"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top App Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <button class="sidebar-toggle-btn" id="sidebar-toggle" aria-label="Toggle Sidebar">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div>
+            <h1 class="page-title">SERVER HEALTH MONITORING</h1>
+            <p class="page-subtitle">Real-time HTTP Connectivity & Finite State Machine Health Classification</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-secondary" id="btn-check-all">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Check All Now</span>
+          </button>
+          <button class="btn btn-primary" id="btn-open-add-modal">
+            <i class="fa-solid fa-plus"></i>
+            <span>Add Server</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Container -->
+      <div class="content-body">
+        
+        <!-- ================= SECTION A: OVERVIEW ================= -->
+        <section id="section-overview" class="tab-section active">
+          
+          <!-- Summary Cards Grid -->
+          <div class="stats-grid">
+            
+            <div class="stat-card total-card">
+              <div class="stat-icon-wrapper">
+                <i class="fa-solid fa-cubes"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Total Servers</span>
+                <div class="stat-number" id="stat-total">0</div>
+                <span class="stat-subtext">Monitored endpoints</span>
+              </div>
+            </div>
+
+            <div class="stat-card healthy-card">
+              <div class="stat-icon-wrapper">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Healthy Servers</span>
+                <div class="stat-number" id="stat-healthy">0</div>
+                <span class="stat-subtext text-success">State: HEALTHY (2xx)</span>
+              </div>
+            </div>
+
+            <div class="stat-card down-card">
+              <div class="stat-icon-wrapper">
+                <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Down Servers</span>
+                <div class="stat-number" id="stat-down">0</div>
+                <span class="stat-subtext text-danger">State: DOWN (Failed/Timeout)</span>
+              </div>
+            </div>
+
+            <div class="stat-card unknown-card">
+              <div class="stat-icon-wrapper">
+                <i class="fa-solid fa-circle-question"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Unknown Servers</span>
+                <div class="stat-number" id="stat-unknown">0</div>
+                <span class="stat-subtext text-muted">State: UNKNOWN (Unchecked)</span>
+              </div>
+            </div>
+
+            <div class="stat-card availability-card">
+              <div class="stat-icon-wrapper">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Overall Availability</span>
+                <div class="stat-number" id="stat-availability">100%</div>
+                <span class="stat-subtext" id="stat-avg-latency">Avg Latency: 0ms</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Quick Fleet Cards Preview -->
+          <div class="section-card">
+            <div class="card-header-flex">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-server"></i> Live Server Fleet Status</h3>
+                <p class="card-subtitle">Real-time connectivity status and state classifications</p>
+              </div>
+              <div class="card-header-actions">
+                <button class="btn btn-sm btn-outline" id="btn-seed-sample" title="Restore sample test servers if needed">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Restore Defaults
+                </button>
+              </div>
+            </div>
+
+            <!-- Server Cards Grid -->
+            <div class="server-cards-container" id="overview-server-cards">
+              <!-- Dynamically populated server cards -->
+              <div class="loading-state">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <p>Loading server monitoring data...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- FSM Visual Transition Strip -->
+          <div class="section-card fsm-visual-card">
+            <div class="card-header-flex">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-diagram-project"></i> Finite State Machine (FSM) Engine</h3>
+                <p class="card-subtitle">Server classification transitions based on HTTP connectivity</p>
+              </div>
+              <a href="#fsm-guide" class="btn btn-sm btn-outline" data-tab="fsm-guide">View Rules & Specs</a>
+            </div>
+
+            <div class="fsm-flow-strip">
+              <div class="fsm-node node-unknown">
+                <div class="fsm-node-badge gray-badge">UNKNOWN</div>
+                <span class="fsm-node-desc">Initial registered state</span>
+              </div>
+              <div class="fsm-arrow">
+                <span class="arrow-label text-success">2xx Success</span>
+                <i class="fa-solid fa-arrow-right-long text-success"></i>
+              </div>
+              <div class="fsm-node node-healthy">
+                <div class="fsm-node-badge green-badge">HEALTHY</div>
+                <span class="fsm-node-desc">HTTP 2xx & Responsive</span>
+              </div>
+              <div class="fsm-arrow bi-directional">
+                <div class="arrow-up text-danger">
+                  <span class="arrow-label">Fail / Timeout</span>
+                  <i class="fa-solid fa-arrow-right-long text-danger"></i>
+                </div>
+                <div class="arrow-down text-success">
+                  <i class="fa-solid fa-arrow-left-long text-success"></i>
+                  <span class="arrow-label">Recovered</span>
+                </div>
+              </div>
+              <div class="fsm-node node-down">
+                <div class="fsm-node-badge red-badge">DOWN</div>
+                <span class="fsm-node-desc">Unresponsive / Non-2xx</span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION B: SERVER LIST ================= -->
+        <section id="section-servers" class="tab-section">
+          
+          <div class="section-card">
+            <div class="card-header-flex">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-list-check"></i> Server Fleet Management</h3>
+                <p class="card-subtitle">Manage test endpoints, manual trigger checks, and monitor latency</p>
+              </div>
+              <button class="btn btn-primary" id="btn-open-add-modal-2">
+                <i class="fa-solid fa-plus"></i> Add New Server
+              </button>
+            </div>
+
+            <!-- Toolbar: Search and Filter -->
+            <div class="table-toolbar">
+              <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" placeholder="Search servers by name or URL...">
+              </div>
+
+              <div class="filter-pills" id="status-filters">
+                <button class="filter-pill active" data-filter="ALL">All (<span id="filter-count-all">0</span>)</button>
+                <button class="filter-pill" data-filter="HEALTHY"><span class="dot green-dot"></span> Healthy (<span id="filter-count-healthy">0</span>)</button>
+                <button class="filter-pill" data-filter="DOWN"><span class="dot red-dot"></span> Down (<span id="filter-count-down">0</span>)</button>
+                <button class="filter-pill" data-filter="UNKNOWN"><span class="dot gray-dot"></span> Unknown (<span id="filter-count-unknown">0</span>)</button>
+              </div>
+            </div>
+
+            <!-- Server Table -->
+            <div class="table-responsive">
+              <table class="data-table" id="servers-table">
+                <thead>
+                  <tr>
+                    <th>Server Name & URL</th>
+                    <th>FSM State</th>
+                    <th>Connectivity</th>
+                    <th>HTTP Status</th>
+                    <th>Response Time</th>
+                    <th>Last Checked</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="servers-table-body">
+                  <!-- Populated via script.js -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION C: ANALYTICS ================= -->
+        <section id="section-analytics" class="tab-section">
+          
+          <div class="charts-grid">
+            
+            <!-- Latency Trends Chart -->
+            <div class="section-card chart-card">
+              <div class="card-header-flex">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-chart-line"></i> Server Response Time History (ms)</h3>
+                  <p class="card-subtitle">Real-time latency performance over recent checks</p>
+                </div>
+                <span class="badge badge-info">Performance Timing</span>
+              </div>
+              <div class="chart-wrapper">
+                <canvas id="responseTimeChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Health Status Distribution -->
+            <div class="section-card chart-card">
+              <div class="card-header-flex">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Health State Distribution</h3>
+                  <p class="card-subtitle">Proportion of Healthy, Down, and Unknown servers</p>
+                </div>
+                <span class="badge badge-secondary">FSM Breakdown</span>
+              </div>
+              <div class="chart-wrapper doughnut-wrapper">
+                <canvas id="healthDistributionChart"></canvas>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Deep Metrics Row -->
+          <div class="section-card">
+            <h3 class="card-title"><i class="fa-solid fa-gauge-high"></i> Availability & Performance Summary</h3>
+            <div class="metrics-row">
+              <div class="metric-item">
+                <span class="metric-title">Auto Monitoring Interval</span>
+                <span class="metric-val text-primary">30 Seconds</span>
+                <span class="metric-desc">Background scheduler</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-title">Average Latency</span>
+                <span class="metric-val text-info" id="metric-avg-latency">0 ms</span>
+                <span class="metric-desc">Across healthy endpoints</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-title">Active Health Rate</span>
+                <span class="metric-val text-success" id="metric-health-rate">0%</span>
+                <span class="metric-desc">Healthy / Total</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-title">Overlap Protection</span>
+                <span class="metric-val text-success"><i class="fa-solid fa-lock"></i> Enabled</span>
+                <span class="metric-desc">Prevents concurrent checks</span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION D: HISTORY ================= -->
+        <section id="section-history" class="tab-section">
+          
+          <div class="section-card">
+            <div class="card-header-flex">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Health-Check Transition History</h3>
+                <p class="card-subtitle">Audited log of state changes, latencies, and HTTP response codes</p>
+              </div>
+              <div class="card-header-actions">
+                <button class="btn btn-sm btn-outline" id="btn-refresh-history">
+                  <i class="fa-solid fa-rotate"></i> Refresh
+                </button>
+                <button class="btn btn-sm btn-outline-danger" id="btn-clear-history">
+                  <i class="fa-solid fa-trash-can"></i> Clear History
+                </button>
+              </div>
+            </div>
+
+            <!-- History Filters -->
+            <div class="table-toolbar">
+              <div class="select-wrapper">
+                <label for="history-filter-server">Filter by Server:</label>
+                <select id="history-filter-server" class="form-control select-control">
+                  <option value="">All Monitored Servers</option>
+                </select>
+              </div>
+
+              <div class="select-wrapper">
+                <label for="history-filter-status">Filter by Current State:</label>
+                <select id="history-filter-status" class="form-control select-control">
+                  <option value="">All States</option>
+                  <option value="HEALTHY">HEALTHY</option>
+                  <option value="DOWN">DOWN</option>
+                  <option value="UNKNOWN">UNKNOWN</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- History Table -->
+            <div class="table-responsive">
+              <table class="data-table" id="history-table">
+                <thead>
+                  <tr>
+                    <th>Checked At</th>
+                    <th>Server Name</th>
+                    <th>State Transition</th>
+                    <th>HTTP Status</th>
+                    <th>Response Time</th>
+                    <th>Outcome / Details</th>
+                  </tr>
+                </thead>
+                <tbody id="history-table-body">
+                  <!-- Populated via script.js -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION E: FSM GUIDE ================= -->
+        <section id="section-fsm-guide" class="tab-section">
+          
+          <div class="section-card">
+            <div class="card-header-flex">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-diagram-project"></i> Finite State Machine Specification</h3>
+                <p class="card-subtitle">Formal state machine definitions and transition semantics</p>
+              </div>
+              <span class="badge badge-success">3 Defined States</span>
+            </div>
+
+            <div class="fsm-spec-grid">
+              
+              <!-- State Card 1 -->
+              <div class="fsm-spec-card">
+                <div class="fsm-spec-header">
+                  <span class="status-badge gray-badge"><i class="fa-solid fa-circle-question"></i> UNKNOWN</span>
+                  <span class="fsm-badge-type">Initial State</span>
+                </div>
+                <p class="fsm-spec-text">Assigned automatically to any newly added server or when no connectivity checks have been executed yet.</p>
+                <ul class="fsm-rules-list">
+                  <li><strong>Next State:</strong> Transitions to <code>HEALTHY</code> upon first 2xx HTTP response.</li>
+                  <li><strong>Next State:</strong> Transitions to <code>DOWN</code> if first check fails, times out, or returns non-2xx.</li>
+                </ul>
+              </div>
+
+              <!-- State Card 2 -->
+              <div class="fsm-spec-card">
+                <div class="fsm-spec-header">
+                  <span class="status-badge green-badge"><i class="fa-solid fa-circle-check"></i> HEALTHY</span>
+                  <span class="fsm-badge-type">Operational State</span>
+                </div>
+                <p class="fsm-spec-text">The server successfully responded to the HTTP request with a standard successful status code (200–299).</p>
+                <ul class="fsm-rules-list">
+                  <li><strong>Next State:</strong> Maintains <code>HEALTHY</code> if subsequent check returns 2xx.</li>
+                  <li><strong>Next State:</strong> Transitions to <code>DOWN</code> immediately if request times out or returns error.</li>
+                </ul>
+              </div>
+
+              <!-- State Card 3 -->
+              <div class="fsm-spec-card">
+                <div class="fsm-spec-header">
+                  <span class="status-badge red-badge"><i class="fa-solid fa-circle-exclamation"></i> DOWN</span>
+                  <span class="fsm-badge-type">Failure State</span>
+                </div>
+                <p class="fsm-spec-text">The server failed to respond within timeout window, connection was refused/unreachable, or returned an error status code.</p>
+                <ul class="fsm-rules-list">
+                  <li><strong>Next State:</strong> Transitions to <code>HEALTHY</code> once a check successfully yields 2xx (Recovery).</li>
+                  <li><strong>Next State:</strong> Maintains <code>DOWN</code> as long as errors persist.</li>
+                </ul>
+              </div>
+
+            </div>
+
+            <!-- Transition Rules Table -->
+            <h4 class="subheading-margin"><i class="fa-solid fa-table-list"></i> FSM State Transition Matrix</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>From State</th>
+                    <th>To State</th>
+                    <th>Trigger Condition</th>
+                    <th>FSM Action & Logging</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="status-badge gray-badge">UNKNOWN</span></td>
+                    <td><span class="status-badge green-badge">HEALTHY</span></td>
+                    <td>First HTTP health check succeeds with <code>2xx</code> status code</td>
+                    <td>Server marked Healthy; latency and status recorded to MongoDB.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge gray-badge">UNKNOWN</span></td>
+                    <td><span class="status-badge red-badge">DOWN</span></td>
+                    <td>First check fails, times out (&gt;5000ms), or returns non-2xx</td>
+                    <td>Server marked Down; error details and timestamp stored.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge green-badge">HEALTHY</span></td>
+                    <td><span class="status-badge red-badge">DOWN</span></td>
+                    <td>Server experiences outage, timeout, connection drop, or HTTP 4xx/5xx</td>
+                    <td>Health degradation detected; transition event flagged in history.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge red-badge">DOWN</span></td>
+                    <td><span class="status-badge green-badge">HEALTHY</span></td>
+                    <td>Server recovers and returns successful <code>2xx</code> response</td>
+                    <td>Server recovery logged; availability recalculated.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge green-badge">HEALTHY</span></td>
+                    <td><span class="status-badge green-badge">HEALTHY</span></td>
+                    <td>Subsequent check continues returning <code>2xx</code></td>
+                    <td>State maintained; latest response time updated.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge red-badge">DOWN</span></td>
+                    <td><span class="status-badge red-badge">DOWN</span></td>
+                    <td>Subsequent check continues failing or timing out</td>
+                    <td>Failure state maintained; error timestamp logged.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Add Server Modal -->
+  <div class="modal-overlay" id="add-server-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-server"></i> Add New Server</h3>
+        <button class="modal-close-btn" data-close-modal="add-server-modal">&times;</button>
+      </div>
+      <form id="add-server-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="add-server-name">Server Name <span class="required">*</span></label>
+            <input type="text" id="add-server-name" class="form-control" placeholder="e.g., Production API or Google" required>
+          </div>
+          <div class="form-group">
+            <label for="add-server-url">Server URL <span class="required">*</span></label>
+            <input type="url" id="add-server-url" class="form-control" placeholder="e.g., https://example.com or http://localhost:5000/health" required>
+            <small class="form-hint">Must be an accessible HTTP or HTTPS URL.</small>
+          </div>
+          <div class="fsm-initial-note">
+            <i class="fa-solid fa-info-circle"></i> Newly registered servers start with FSM state <strong>UNKNOWN</strong> until checked.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="add-server-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-add">Add Server</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Server Modal -->
+  <div class="modal-overlay" id="edit-server-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-pen-to-square"></i> Edit Server Details</h3>
+        <button class="modal-close-btn" data-close-modal="edit-server-modal">&times;</button>
+      </div>
+      <form id="edit-server-form">
+        <input type="hidden" id="edit-server-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="edit-server-name">Server Name <span class="required">*</span></label>
+            <input type="text" id="edit-server-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-server-url">Server URL <span class="required">*</span></label>
+            <input type="url" id="edit-server-url" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="edit-server-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-edit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="delete-server-modal">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3 class="modal-title text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Confirm Server Deletion</h3>
+        <button class="modal-close-btn" data-close-modal="delete-server-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to remove <strong id="delete-server-name-label">this server</strong> from monitoring?</p>
+        <p class="text-muted small">All historical health-check transition records for this server will also be deleted.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="delete-server-modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-delete">Delete Server</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Application Script -->
+  <script src="script.js"></script>
+</body>
+</html>

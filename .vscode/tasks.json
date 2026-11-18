@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "start",
+      "path": "backend/",
+      "problemMatcher": [],
+      "label": "npm: start (backend)",
+      "detail": "Starts the Express backend server and serves the dashboard",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "install",
+      "path": "backend/",
+      "problemMatcher": [],
+      "label": "npm: install (backend)",
+      "detail": "Installs dependencies in backend folder"
+    }
+  ]
+}
